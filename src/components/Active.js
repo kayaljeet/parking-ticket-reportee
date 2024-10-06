@@ -3,19 +3,36 @@
 import React, { useEffect, useState } from 'react';
 import Navbar from './Navbar';
 import { ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { FaPen } from 'react-icons/fa';
 import axios from 'axios';
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table"
-export default function History() {
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../components/ui/dialog"
+
+export default function Active() {
+  const navigate = useNavigate();
   const [challans, setChallans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [selectedChallan, setSelectedChallan] = useState(null);
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'ascending' });
-  const [isOpen, setIsOpen] = useState(false);
+  const [confirmationText, setConfirmationText] = useState('');
+  const [status, setStatus] = useState('');
+  const [isOpen, setIsOpen] = useState(false); // Add this line
 
   useEffect(() => {
     const fetchChallans = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/completed');
+        const response = await axios.get('http://localhost:5000/locations');
         setChallans(response.data);
       } catch (err) {
         console.error('Error fetching challans:', err);
@@ -27,6 +44,49 @@ export default function History() {
 
     fetchChallans();
   }, []);
+
+  const handleMapClick = (id) => {
+    navigate(`/map?id=${id}&zoom=25`);
+  };
+
+  const handleEditClick = (challan) => {
+    setSelectedChallan(challan);
+    setIsPopupOpen(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedChallan || confirmationText !== 'Confirm' || !status) {
+      alert("Please enter 'Confirm' and select a status");
+      return;
+    }
+
+    const updatedData = {
+      last_reviewed_by: 'Joe',
+      last_modified: new Date().toISOString(),
+      status: status, // Update status here
+    };
+
+    try {
+      const response = await axios.put(
+        `http://localhost:5000/locations/${selectedChallan._id}`,
+        updatedData
+      );
+
+      setChallans((prevChallans) =>
+        prevChallans.map((challan) =>
+          challan._id === selectedChallan._id ? response.data : challan
+        )
+      );
+
+      setIsPopupOpen(false);
+    } catch (err) {
+      console.error('Error updating challan:', err.response ? err.response.data : err.message);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setSelectedChallan((prev) => ({ ...prev, [field]: value }));
+  };
 
   const requestSort = (key) => {
     const direction =
@@ -79,7 +139,7 @@ export default function History() {
       <Navbar isOpen={isOpen} setIsOpen={setIsOpen} />
       <div className="flex-grow p-8 flex flex-col">
       <div className="bg-white rounded-lg flex-1 flex flex-col p-4 sm:p-6 md:p-8 pt-16 sm:pt-20 md:pt-8">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8 text-center md:text-left">Challan History</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8 text-center md:text-left">Active Challans</h1>
         <div className="bg-white rounded-lg shadow-md flex-1 flex flex-col overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto h-[600px] sm:h-[600px] md:h-[600px] lg:h-[600px] scrollbar-thin scrollbar-thumb-red-800 scrollbar-track-gray-300 scrollbar-thumb-rounded-full">
             <Table>
@@ -116,6 +176,7 @@ export default function History() {
                   <TableHead className="cursor-pointer" onClick={() => requestSort('status')}>
                     Status <ChevronDown className={`inline ml-1 h-4 w-4 ${sortConfig.key === 'status' && sortConfig.direction === 'ascending' ? 'rotate-180' : ''}`} />
                   </TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -138,11 +199,28 @@ export default function History() {
                     <TableCell>
                       <span
                         className={`inline-block rounded-full px-2 py-1 text-xs font-semibold ${
-                          challan.status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-red-500'
+                          challan.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         }`}
                       >
                         {challan.status}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleMapClick(challan._id)}
+                        className="mr-2"
+                      >
+                        Map
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditClick(challan)}
+                      >
+                        <FaPen className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -152,6 +230,44 @@ export default function History() {
         </div>
       </div>
       </div>
+      <Dialog open={isPopupOpen} onOpenChange={setIsPopupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Challan</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label htmlFor="confirmation" className="text-right">
+                Confirm
+              </label>
+              <Input
+                id="confirmation"
+                value={confirmationText}
+                onChange={(e) => setConfirmationText(e.target.value)}
+                className="col-span-3"
+                placeholder="Enter 'Confirm' to confirm"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label className="text-right">Status</label>
+              <div className="col-span-3 flex space-x-2">
+                <Button variant={status === 'Completed' ? "solid" : "outline"} onClick={() => setStatus('Completed')}>
+                  Completed
+                </Button>
+                <Button variant={status === 'Closed' ? "solid" : "outline"} onClick={() => setStatus('Closed')}>
+                  Closed
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setIsPopupOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate}>Submit</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
