@@ -8,7 +8,7 @@ Clone this repository with:
 ### `git clone https://github.com/kayaljeet/parking-ticket-admin.git`
 
 Once cloned, change the directory using:
-### `cd parking-ticket-admint`
+### `cd parking-ticket-admin`
 
 And start a React App using:
 ### `npm start`
